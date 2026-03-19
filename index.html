@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Resume Analyzer</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f9;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 450px;
+            margin: auto;
+            box-shadow: 0px 5px 15px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px;
+            margin-top: 15px;
+            width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .loader {
+            display: none;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .result {
+            text-align: left;
+            margin-top: 20px;
+        }
+
+        .skill {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 5px;
+            background: #e0f3ff;
+        }
+
+        .missing {
+            background: #ffd6d6;
+        }
+
+        .score {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .section {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>📄 AI Resume Analyzer</h2>
+
+    <input type="file" id="fileInput" />
+
+    <textarea id="jobDesc" placeholder="Paste Job Description (optional)"></textarea>
+
+    <button onclick="uploadResume()">Analyze Resume</button>
+
+    <div class="loader" id="loader">⏳ Analyzing your resume...</div>
+
+    <div class="result" id="result"></div>
+
+</div>
+
+<script>
+async function uploadResume() {
+    const fileInput = document.getElementById("fileInput");
+    const jobDesc = document.getElementById("jobDesc").value;
+    const resultBox = document.getElementById("result");
+    const loader = document.getElementById("loader");
+
+    if (!fileInput.files.length) {
+        alert("Please select a resume file");
+        return;
+    }
+
+    resultBox.innerHTML = "";
+    loader.style.display = "block";
+
+    const formData = new FormData();
+    formData.append("resume", fileInput.files[0]);
+    formData.append("job_desc", jobDesc);
+
+    try {
+        const response = await fetch("http://127.0.0.1:5000/analyze", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+        loader.style.display = "none";
+
+        // Resume score
+        const score = data.skills_found.length * 15;
+
+        // Skills UI
+        let skillsHTML = "";
+        data.skills_found.forEach(skill => {
+            skillsHTML += `<span class="skill">${skill}</span>`;
+        });
+
+        // Missing Skills UI
+        let missingHTML = "";
+        data.missing_skills.forEach(skill => {
+            missingHTML += `<span class="skill missing">${skill}</span>`;
+        });
+
+        resultBox.innerHTML = `
+            <div class="section">
+                <h3>✅ Skills Found</h3>
+                ${skillsHTML || "No skills detected"}
+            </div>
+
+            <div class="section">
+                <h3>❌ Missing Skills</h3>
+                ${missingHTML || "None"}
+            </div>
+
+            <div class="section">
+                <h3>📊 Resume Score</h3>
+                <div class="score">${score}/100</div>
+            </div>
+
+            <div class="section">
+                <h3>🎯 Job Match Score</h3>
+                <div class="score">${data.match_score}%</div>
+            </div>
+
+            <div class="section">
+                <h3>💡 Suggestions</h3>
+                <p>${data.suggestion}</p>
+            </div>
+        `;
+
+    } catch (error) {
+        loader.style.display = "none";
+        resultBox.innerHTML = "❌ Error connecting to backend";
+    }
+}
+</script>
+
+</body>
+</html>
