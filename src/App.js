@@ -1,75 +1,101 @@
 import React, { useState } from "react";
-import "./App.css";
+
+const API_URL = "https://resume-analyzer-backend-18s0.onrender.com";
 
 function App() {
   const [file, setFile] = useState(null);
   const [jobDesc, setJobDesc] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [result, setResult] = useState(null);
 
-  const uploadResume = async () => {
+  // Handle file upload
+  const handleFileChange = (e) => { 
+    setFile(e.target.files[0]);
+  };
+
+  // Handle job description input
+  const handleJobDescChange = (e) => {
+    setJobDesc(e.target.value);
+  };
+
+  // Call backend API
+  const handleSubmit = async () => {
     if (!file) {
-      alert("Please upload resume");
+      alert("Please upload a resume");
       return;
     }
 
     const formData = new FormData();
-    formData.append("resume", file);
+    formData.append("resume", file); // MUST match backend
     formData.append("job_desc", jobDesc);
 
-    setLoading(true);
-
     try {
-      const res = await fetch("http://127.0.0.1:5000/analyze", {
+      const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         body: formData,
       });
 
-      const result = await res.json();
-      setData(result);
-    } catch (err) {
-      alert("Error connecting to backend");
+      const data = await response.json();
+      setResult(data);
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Something went wrong while analyzing resume");
     }
-
-    setLoading(false);
   };
 
-  const score = data ? data.skills_found.length * 15 : 0;
-
   return (
-    <div className="container">
-      <h2>📄 AI Resume Analyzer</h2>
+    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+      <h2>Resume Analyzer AI 🤖</h2>
 
-      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+      {/* File Upload */}
+      <input type="file" onChange={handleFileChange} />
 
+      <br /><br />
+
+      {/* Job Description */}
       <textarea
-        placeholder="Paste Job Description"
+        placeholder="Enter job description (optional)"
         value={jobDesc}
-        onChange={(e) => setJobDesc(e.target.value)}
+        onChange={handleJobDescChange}
+        rows={6}
+        cols={60}
       />
 
-      <button onClick={uploadResume}>Analyze Resume</button>
+      <br /><br />
 
-      {loading && <p>⏳ Analyzing...</p>}
+      {/* Submit Button */}
+      <button onClick={handleSubmit}>
+        Analyze Resume
+      </button>
 
-      {data && (
-        <div className="result">
-          <h3>✅ Skills Found</h3>
-          {data.skills_found.map((s, i) => (
-            <span key={i} className="skill">{s}</span>
-          ))}
+      <br /><br />
 
-          <h3>❌ Missing Skills</h3>
-          {data.missing_skills.map((s, i) => (
-            <span key={i} className="skill missing">{s}</span>
-          ))}
+      {/* Results */}
+      {result && (
+        <div>
+          <h3>Results:</h3>
 
-          <h3>📊 Score: {score}/100</h3>
+          <p>
+            <strong>Match Score:</strong> {result.match_score}%
+          </p>
 
-          <h3>🎯 Match Score: {data.match_score}%</h3>
+          <h4>Skills Found:</h4>
+          <ul>
+            {result.skills_found.map((skill, index) => (
+              <li key={index}>{skill}</li>
+            ))}
+          </ul>
 
-          <h3>💡 Suggestions</h3>
-          <p>{data.suggestion}</p>
+          <h4>Missing Skills:</h4>
+          <ul>
+            {result.missing_skills.map((skill, index) => (
+              <li key={index}>{skill}</li>
+            ))}
+          </ul>
+
+          <h4>AI Suggestions:</h4>
+          <pre style={{ whiteSpace: "pre-wrap" }}>
+            {result.suggestion}
+          </pre>
         </div>
       )}
     </div>
