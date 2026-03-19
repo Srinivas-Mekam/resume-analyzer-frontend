@@ -1,4 +1,13 @@
 import React, { useState } from "react";
+import { FaMoon, FaSun, FaDownload } from "react-icons/fa";
+import { ClipLoader } from "react-spinners";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 const API_URL = "https://resume-analyzer-backend-18s0.onrender.com";
 
@@ -6,26 +15,27 @@ function App() {
   const [file, setFile] = useState(null);
   const [jobDesc, setJobDesc] = useState("");
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [error, setError] = useState("");
 
-  // Handle file upload
-  const handleFileChange = (e) => { 
-    setFile(e.target.files[0]);
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    document.body.classList.toggle("dark");
   };
 
-  // Handle job description input
-  const handleJobDescChange = (e) => {
-    setJobDesc(e.target.value);
-  };
-
-  // Call backend API
   const handleSubmit = async () => {
     if (!file) {
-      alert("Please upload a resume");
+      setError("Please upload a resume");
       return;
     }
 
+    setLoading(true);
+    setError("");
+    setResult(null);
+
     const formData = new FormData();
-    formData.append("resume", file); // MUST match backend
+    formData.append("resume", file);
     formData.append("job_desc", jobDesc);
 
     try {
@@ -34,68 +44,145 @@ function App() {
         body: formData,
       });
 
+      if (!response.ok) throw new Error("API Error");
+
       const data = await response.json();
       setResult(data);
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Something went wrong while analyzing resume");
+    } catch (err) {
+      setError("Backend connection failed");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const downloadReport = () => {
+    const content = JSON.stringify(result, null, 2);
+    const blob = new Blob([content], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "resume_report.json";
+    a.click();
+  };
+
+  const chartData = result
+    ? [
+        { name: "Found", value: result.skills_found.length },
+        { name: "Missing", value: result.missing_skills.length },
+      ]
+    : [];
+
+  const COLORS = ["#22c55e", "#ef4444"];
+
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <h2>Resume Analyzer AI 🤖</h2>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-6">
 
-      {/* File Upload */}
-      <input type="file" onChange={handleFileChange} />
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Resume Analyzer AI 🤖</h1>
 
-      <br /><br />
+        <button onClick={toggleDarkMode} className="text-xl">
+          {darkMode ? <FaSun /> : <FaMoon />}
+        </button>
+      </div>
 
-      {/* Job Description */}
-      <textarea
-        placeholder="Enter job description (optional)"
-        value={jobDesc}
-        onChange={handleJobDescChange}
-        rows={6}
-        cols={60}
-      />
+      {/* Upload Section */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
+        <input type="file" onChange={(e) => setFile(e.target.files[0])} />
 
-      <br /><br />
+        <textarea
+          className="w-full mt-3 p-3 rounded border dark:bg-gray-700"
+          placeholder="Enter job description..."
+          value={jobDesc}
+          onChange={(e) => setJobDesc(e.target.value)}
+        />
 
-      {/* Submit Button */}
-      <button onClick={handleSubmit}>
-        Analyze Resume
-      </button>
+        <button
+          onClick={handleSubmit}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2"
+        >
+          Analyze Resume
+        </button>
 
-      <br /><br />
+        {error && <p className="text-red-500 mt-2">{error}</p>}
+      </div>
+
+      {/* Loader */}
+      {loading && (
+        <div className="flex justify-center mt-10">
+          <ClipLoader color="#3b82f6" size={50} />
+        </div>
+      )}
 
       {/* Results */}
       {result && (
-        <div>
-          <h3>Results:</h3>
+        <div className="mt-6 space-y-6">
 
-          <p>
-            <strong>Match Score:</strong> {result.match_score}%
-          </p>
+          {/* ATS Score */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow text-center">
+            <h2 className="text-xl">ATS Match Score</h2>
+            <p className="text-4xl font-bold text-green-500">
+              {result.match_score}%
+            </p>
+          </div>
 
-          <h4>Skills Found:</h4>
-          <ul>
-            {result.skills_found.map((skill, index) => (
-              <li key={index}>{skill}</li>
-            ))}
-          </ul>
+          {/* Chart */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
+            <h3 className="mb-4 font-semibold">Skill Distribution</h3>
 
-          <h4>Missing Skills:</h4>
-          <ul>
-            {result.missing_skills.map((skill, index) => (
-              <li key={index}>{skill}</li>
-            ))}
-          </ul>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={index} fill={COLORS[index]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
 
-          <h4>AI Suggestions:</h4>
-          <pre style={{ whiteSpace: "pre-wrap" }}>
-            {result.suggestion}
-          </pre>
+          {/* Skills */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
+              <h3 className="font-semibold mb-2">Skills Found</h3>
+              <ul>
+                {result.skills_found.map((s, i) => (
+                  <li key={i}>✅ {s}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
+              <h3 className="font-semibold mb-2">Missing Skills</h3>
+              <ul>
+                {result.missing_skills.map((s, i) => (
+                  <li key={i}>❌ {s}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* AI Suggestions */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
+            <h3 className="font-semibold mb-2">AI Suggestions</h3>
+            <pre className="whitespace-pre-wrap">{result.suggestion}</pre>
+          </div>
+
+          {/* Download */}
+          <button
+            onClick={downloadReport}
+            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+          >
+            <FaDownload /> Download Report
+          </button>
         </div>
       )}
     </div>
